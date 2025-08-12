@@ -28,6 +28,7 @@ for _, r in df.iterrows():
 
 
 # --- Daten vorbereiten ---
+
 df = pd.read_csv("Data/wohnungen_stuttgart.csv")
 # Sicher: Zeilennummer als ID
 df = df.reset_index(drop=True).reset_index().rename(columns={"index": "row_id"})
