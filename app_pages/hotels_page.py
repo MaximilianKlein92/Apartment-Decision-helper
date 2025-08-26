@@ -1,5 +1,5 @@
 import streamlit as st
 
-def page_hotels_body():
+def page_hotels_body(app):
     st.header("Vacation Homes")
     st.write("Welcome to the Vacation Homes / Hotels / Airbnb decision page.")
