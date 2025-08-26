@@ -1,16 +1,14 @@
-import pandas as pd
+import streamlit as st
 
+from app_pages.multi_page import Multipage
+from app_pages.hotels_page import page_hotels_body
+from app_pages.activities_page import page_activities_body
+from app_pages.housing_page import page_housing_body
 
-columns = [
-    "row_id","Name","Link","Address","Price_per_month","Distance","Duration_per_week",
-    "Group_Size","Trainer_Coach","Equipment_Provided","Food_Drinks","Period","Custom"
-]
+app = Multipage("Decision Decipherer")
 
-# Leeres DataFrame
-df = pd.DataFrame(columns=columns)
+app.add_page("Housing", page_housing_body)
+app.add_page("Vacation Homes / Hotels / Airbnb", page_hotels_body)
+app.add_page("Activities", page_activities_body)
 
-# Speichern
-path = "Data/Activitys.csv"
-df.to_csv(path, index=False)
-
-path
+app.run()

@@ -1,0 +1,5 @@
+import streamlit as st
+
+def page_housing_body():
+    st.header("Housing Options")
+    st.write("Welcome to the Housing Comparison page")
