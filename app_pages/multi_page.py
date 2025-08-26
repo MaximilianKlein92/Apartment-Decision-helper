@@ -6,8 +6,8 @@ class Multipage:
         self.app_name = app_name
 
         st.set_page_config(
-            page_title=self.app_name,
-            page_icon=":money_with_wings:")
+            page_title = self.app_name, 
+            page_icon = ":checkered_flag:")
     
     def add_page(self, title, func) -> None:
         self.pages.append({
