@@ -1,15 +1,15 @@
 import streamlit as st
 import pandas as pd
+from urllib.parse import quote_plus
 
 def page_housing_body(app):
     st.header("Housing Options")
     st.write("Welcome to the Housing Comparison page")
 
-    df = pd.read_csv("Data/Housing.csv", dtype = {
-        "row_id": int,
+    df = pd.read_csv("Data/Housing.csv", dtype={
         "Name": str,
         "Link": str,
-        "Adress": str,
+        "Adress": str,           # note the CSV uses 'Adress'
         "Rent": int,
         "Distance": float,
         "Rooms": float,
@@ -21,21 +21,43 @@ def page_housing_body(app):
         "Custom": str
     })
 
+    # helper: build Google Maps "place" URL
+    def maps_place_url(addr):
+        if pd.isna(addr):
+            return ""
+        s = str(addr).strip()
+        if s == "" or s.lower() == "nan":
+            return ""
+        return f"https://www.google.com/maps/place/{quote_plus(s)}"
+
     st.markdown("### View, Add and Edit your Housing Data:")
 
-    # Make the 'Link' column clickable
-    df["Link"] = df["Link"].apply(lambda x: f"[Link]({x})" if pd.notnull(x) and str(x).strip() not in ["", "nan"] else "")
-    
-    # Display the editable dataframe
-    edit_df = st.data_editor(df, num_rows="dynamic", key="housing_editor",
-                            # make the 'Link' column clickable
-                            column_config={"Link": st.column_config.LinkColumn(
-                                "Link", display_text="Open"
-                            )})
+    # compute (or recompute) the clickable link column
+    df["Adress_Link"] = df["Adress"].apply(maps_place_url)
+
+    edit_df = st.data_editor(
+        df,
+        num_rows="dynamic",
+        key="housing_editor",
+        column_config={
+            "Link": st.column_config.LinkColumn("Link", display_text="Open"),
+            "Adress": st.column_config.TextColumn("Adress"),
+            "Adress_Link": st.column_config.LinkColumn("Adress (Maps)", display_text="Open in Maps"),
+        },
+        column_order=["Name", "Link", "Adress", "Adress_Link", "Rent", "Distance", "Rooms", "Size",
+                      "Kitchen", "Furnished", "Rental Period", "Parking", "Custom"],
+        use_container_width=True,
+        disabled=["Adress_Link"]  # prevent manual edits of the generated URL
+    )
+
+    # live recompute after edits so new/changed addresses get a link immediately
+    edit_df["Adress_Link"] = edit_df["Adress"].apply(maps_place_url)
 
     if st.button("Save Changes"):
-        edit_df.to_csv("Data/Housing.csv", index=False)
+        to_save = edit_df.drop(columns=["Adress_Link"], errors="ignore")
+        to_save.to_csv("Data/Housing.csv", index=False)
         st.success("Changes saved!")
+        st.rerun()
 
     # Add delete buttons next to the dataframe
     st.markdown("#### Delete a Row")
