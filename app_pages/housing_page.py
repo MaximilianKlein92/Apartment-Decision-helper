@@ -1,85 +1,90 @@
 import streamlit as st
 import pandas as pd
-from urllib.parse import quote_plus
 import io
+from urllib.parse import quote_plus
+import plotly.graph_objects as go
 
-def page_housing_body(app):
-    
-    df = pd.read_csv("Data/Housing.csv", dtype={
-        "Name": str,
-        "Link": str,
-        "Adress": str,           # note the CSV uses 'Adress'
-        "Rent": int,
-        "Distance": float,
-        "Rooms": float,
-        "Size": float,
-        "Kitchen": bool,
-        "Furnished": bool,
-        "Rental Period": str,
-        "Parking": bool,
-        "Custom": str
-    })
+# ------------------------ Config ------------------------
 
-    # helper: build Google Maps "place" URL
-    def maps_place_url(addr):
-        if pd.isna(addr):
-            return ""
-        s = str(addr).strip()
-        if s == "" or s.lower() == "nan":
-            return ""
-        return f"https://www.google.com/maps/place/{quote_plus(s)}"
+CSV_PATH = "Data/Housing.csv"
+EXPECTED_COLUMNS = [
+    "Name", "Link", "Adress", "Rent", "Distance", "Rooms", "Size",
+    "Kitchen", "Furnished", "Rental Period", "Parking", "Custom"
+]
 
-    st.write("---" )
+DTYPES = {
+    "Name": str,
+    "Link": str,
+    "Adress": str,  # CSV uses 'Adress'
+    "Rent": int,
+    "Distance": float,
+    "Rooms": float,
+    "Size": float,
+    "Kitchen": bool,
+    "Furnished": bool,
+    "Rental Period": str,
+    "Parking": bool,
+    "Custom": str,
+}
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.header("Housing Options")
-    with col2:
-        uploaded = st.file_uploader(
-            "Upload CSV", type=["csv"], key="housing_uploader",
-            help="Upload a CSV file to replace the current housing data."
-        )
+# ------------------------ Helpers ------------------------
 
-        if uploaded is not None:
-            try:
-                # Variante A: saubere Kopie -> immer frischer Stream
-                uploaded_bytes = uploaded.getvalue()
-                uploaded_df = pd.read_csv(io.BytesIO(uploaded_bytes))
+def maps_place_url(addr) -> str:
+    """Build Google Maps 'place' URL from a free-text address."""
+    if pd.isna(addr):
+        return ""
+    s = str(addr).strip()
+    if s == "" or s.lower() == "nan":
+        return ""
+    return f"https://www.google.com/maps/place/{quote_plus(s)}"
 
-                # Alternativ (Variante B): Stream zurückspulen
-                # uploaded.seek(0)
-                # uploaded_df = pd.read_csv(uploaded)
-
-                expected_columns = [
-                    "Name", "Link", "Adress", "Rent", "Distance", "Rooms", "Size",
-                    "Kitchen", "Furnished", "Rental Period", "Parking", "Custom"
-                ]
-                if all(col in uploaded_df.columns for col in expected_columns):
-                    uploaded_df = uploaded_df[expected_columns]
-                    uploaded_df.to_csv("Data/Housing.csv", index=False)
-                    st.success("File uploaded and data replaced successfully!")
-
-                    # Wichtig: Uploader-State leeren, damit beim nächsten rerun
-                    # nicht erneut aus einem verbrauchten Stream gelesen wird.
-                    st.session_state.pop("housing_uploader", None)
-                    st.rerun()
-                else:
-                    st.error(
-                        "Uploaded CSV must contain the following columns: "
-                        + ", ".join(expected_columns)
-                    )
-            except Exception as e:
-                st.error(f"Error reading uploaded file: {e}")
-
-
-    st.write("---" )
-    st.markdown("### View, Add and Edit your Housing Data:")
-
-    # compute (or recompute) the clickable link column
+def add_maps_link_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Add/refresh generated clickable link column."""
+    df = df.copy()
     df["Adress_Link"] = df["Adress"].apply(maps_place_url)
+    return df
 
-    edit_df = st.data_editor(
-        df,
+def validate_columns(df: pd.DataFrame) -> bool:
+    return all(col in df.columns for col in EXPECTED_COLUMNS)
+
+def load_housing(path: str = CSV_PATH) -> pd.DataFrame:
+    return pd.read_csv(path, dtype=DTYPES)
+
+def save_housing(df: pd.DataFrame, path: str = CSV_PATH) -> None:
+    df.to_csv(path, index=False)
+
+def parse_uploaded_csv(uploaded_file) -> pd.DataFrame:
+    """Read uploaded CSV from a fresh BytesIO stream."""
+    data = uploaded_file.getvalue()
+    return pd.read_csv(io.BytesIO(data))
+
+# ------------------------ UI Blocks ------------------------
+
+def uploader_block():
+    uploaded = st.file_uploader(
+        "Upload CSV", type=["csv"], key="housing_uploader",
+        help="Upload a CSV file to replace the current housing data."
+    )
+    if uploaded is not None:
+        try:
+            up_df = parse_uploaded_csv(uploaded)
+            if not validate_columns(up_df):
+                st.error("Uploaded CSV must contain: " + ", ".join(EXPECTED_COLUMNS))
+                return
+            up_df = up_df[EXPECTED_COLUMNS]
+            save_housing(up_df)
+            st.success("File uploaded and data replaced successfully!")
+            st.session_state.pop("housing_uploader", None)  # clear used stream
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error reading uploaded file: {e}")
+
+def editor_block(df: pd.DataFrame) -> pd.DataFrame:
+    """Render editor (with clickable link column). Return edited df."""
+    df_with_links = add_maps_link_column(df)
+
+    edited = st.data_editor(
+        df_with_links,
         num_rows="dynamic",
         key="housing_editor",
         column_config={
@@ -87,34 +92,50 @@ def page_housing_body(app):
             "Adress": st.column_config.TextColumn("Adress"),
             "Adress_Link": st.column_config.LinkColumn("Adress (Maps)", display_text="Open in Maps"),
         },
-        column_order=["Name", "Link", "Adress", "Adress_Link", "Rent", "Distance", "Rooms", "Size",
-                      "Kitchen", "Furnished", "Rental Period", "Parking", "Custom"],
+        column_order=[
+            "Name", "Link", "Adress", "Adress_Link", "Rent", "Distance", "Rooms", "Size",
+            "Kitchen", "Furnished", "Rental Period", "Parking", "Custom"
+        ],
         use_container_width=True,
-        disabled=["Adress_Link"]  # prevent manual edits of the generated URL
+        disabled=["Adress_Link"],  # generated
     )
 
-    # live recompute after edits so new/changed addresses get a link immediately
-    edit_df["Adress_Link"] = edit_df["Adress"].apply(maps_place_url)
+    # refresh generated column after edits
+    edited["Adress_Link"] = edited["Adress"].apply(maps_place_url)
+    return edited
 
-    if st.button("Save Changes"):
-        to_save = edit_df.drop(columns=["Adress_Link"], errors="ignore")
-        to_save.to_csv("Data/Housing.csv", index=False)
-        st.success("Changes saved!")
-        st.rerun()
-
-    # Add delete buttons below the dataframe
-    st.markdown("#### Delete a Row")
-    
+def actions_block(edited: pd.DataFrame):
     col1, col2 = st.columns(2)
     with col1:
-        row_to_delete = st.number_input("Enter row index to delete (First Row = 0)", min_value=0, max_value=len(edit_df)-1, step=1)
+        if st.button("Save Changes"):
+            to_save = edited.drop(columns=["Adress_Link"], errors="ignore")
+            save_housing(to_save)
+            st.success("Changes saved!")
+            st.rerun()
     with col2:
+        # Download what is currently shown (without generated column)
+        to_download = edited.drop(columns=["Adress_Link"], errors="ignore")
+        csv_bytes = to_download.to_csv(index=False).encode("utf-8")
+        st.download_button("Download CSV", csv_bytes, file_name="Housing.csv", mime="text/csv")
+
+def delete_block(edited: pd.DataFrame):
+    st.markdown("#### Delete a Row")
+    c1, c2 = st.columns(2)
+    with c1:
+        max_idx = max(len(edited) - 1, 0)
+        row_to_delete = st.number_input(
+            "Enter row index to delete (First Row = 0)",
+            min_value=0, max_value=max_idx, step=1
+        )
+    with c2:
         if st.button("Delete Selected Row"):
-            edit_df = edit_df.drop(row_to_delete)
-            edit_df.to_csv("Data/Housing.csv", index=False)
+            df_del = edited.drop(index=row_to_delete).reset_index(drop=True)
+            df_del = df_del.drop(columns=["Adress_Link"], errors="ignore")
+            save_housing(df_del)
             st.success(f"Deleted row {row_to_delete}")
             st.rerun()
 
+def add_sidebar_block():
     st.sidebar.markdown("### Add New Housing Option")
     with st.sidebar.form("add_housing_form"):
         name = st.text_input("Name")
@@ -144,10 +165,57 @@ def page_housing_body(app):
                 "Furnished": furnished,
                 "Rental Period": rental_period,
                 "Parking": parking,
-                "Custom": custom
+                "Custom": custom,
             }
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            df.to_csv("Data/Housing.csv", index=False)
+            base = load_housing()
+            base = pd.concat([base, pd.DataFrame([new_row])], ignore_index=True)
+            save_housing(base)
             st.sidebar.success("New housing option added!")
             st.rerun()
-    
+
+# ------------------------ Page ------------------------
+
+def page_housing_body(app):
+    st.write("---")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.header("Housing Options")
+    with col2:
+        uploader_block()
+
+    def plotly_block():
+        df = load_housing()
+        if df.empty:
+            st.info("No data to plot. Please add housing options first.")
+            return
+        fig = go.Figure(data=go.Scatter(
+            x=df["Distance"],
+            y=df["Rent"],
+            mode="markers",
+            marker=dict(
+                size=df["Size"] / 2,
+                color=df["Rooms"],
+                showscale=True,
+                colorscale="Viridis"
+            ),
+            text=df[["Name", "Adress", "Link"]],
+            hoverinfo="text"
+        ))
+        fig.update_layout(
+            title="Housing Options: Rent vs Distance (Size as bubble size, Rooms as color)",
+            xaxis_title="Distance",
+            yaxis_title="Rent"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    plotly_block()
+
+    st.write("---")
+    st.markdown("### View, Add and Edit your Housing Data:")
+
+    df = load_housing()
+    edited = editor_block(df)
+    actions_block(edited)
+    delete_block(edited)
+    add_sidebar_block()
