@@ -82,22 +82,24 @@ def uploader_block():
 def editor_block(df: pd.DataFrame) -> pd.DataFrame:
     """Render editor (with clickable link column). Return edited df."""
     df_with_links = add_maps_link_column(df)
+    df_with_links = df_with_links.reset_index()  # Add index as a column
 
     edited = st.data_editor(
         df_with_links,
         num_rows="dynamic",
         key="housing_editor",
         column_config={
+            "index": st.column_config.NumberColumn("Index", disabled=True),
             "Link": st.column_config.LinkColumn("Link", display_text="Open"),
             "Adress": st.column_config.TextColumn("Adress"),
             "Adress_Link": st.column_config.LinkColumn("Adress (Maps)", display_text="Open in Maps"),
         },
         column_order=[
-            "Name", "Link", "Adress", "Adress_Link", "Rent", "Distance", "Rooms", "Size",
+            "index", "Name", "Link", "Adress", "Adress_Link", "Rent", "Distance", "Rooms", "Size",
             "Kitchen", "Furnished", "Rental Period", "Parking", "Custom"
         ],
         use_container_width=True,
-        disabled=["Adress_Link"],  # generated
+        disabled=["Adress_Link", "index"],  # generated and index
     )
 
     # refresh generated column after edits
@@ -120,15 +122,14 @@ def actions_block(edited: pd.DataFrame):
 
 def delete_block(edited: pd.DataFrame):
     st.markdown("#### Delete a Row")
-    c1, c2 = st.columns(2)
-    with c1:
-        max_idx = max(len(edited) - 1, 0)
-        row_to_delete = st.number_input(
-            "Enter row index to delete (First Row = 0)",
-            min_value=0, max_value=max_idx, step=1
+    
+    max_idx = max(len(edited) - 1, 0)
+    row_to_delete = st.number_input(
+        "Enter row index to delete",
+        min_value=0, max_value=max_idx, step=1
         )
-    with c2:
-        if st.button("Delete Selected Row"):
+
+    if st.button("Delete Selected Row Permanently"):
             df_del = edited.drop(index=row_to_delete).reset_index(drop=True)
             df_del = df_del.drop(columns=["Adress_Link"], errors="ignore")
             save_housing(df_del)
@@ -179,8 +180,21 @@ def plotly_block():
         st.info("No data to plot. Please add housing options first.")
         return
 
+    # Multi-select for which rows to display
+    all_indices = list(df.index)
+    selected_indices = st.multiselect(
+        "Select housing options to display (default: all)", 
+        options=all_indices, 
+        default=all_indices,
+        format_func=lambda idx: f"{idx}: {df.loc[idx, 'Name']}"
+    )
+    if not selected_indices:
+        st.info("No options selected.")
+        return
+    df = df.loc[selected_indices].reset_index(drop=True)
+
     axis_options = ["Distance", "Rent", "Rooms", "Size"]
-    hue_options = ["Rooms", "Size", "Kitchen", "Furnished", "Parking"]
+    hue_options = ["Rooms", "Distance", "Size", "Kitchen", "Furnished", "Parking"]
     size_options = ["Size", "Rent", "Distance", "Rooms"]
 
     col1, col2, col3, col4 = st.columns(4)
@@ -196,6 +210,7 @@ def plotly_block():
     # Prepare hover text with all info for each point
     hover_text = [
         "<br>".join([
+            f"Index: {_}",
             f"Name: {row['Name']}",
             f"Adress: {row['Adress']}",
             f"Rent: {row['Rent']}",
@@ -253,7 +268,7 @@ def page_housing_body(app):
 
 
     plotly_block()
-    st.info("Hover over a marker to see all details. Use the table below to open the link.")
+    st.info("Hover over a marker to see all details. Use the table below to open the link or maps.")
 
     st.write("---")
     st.markdown("### View, Add and Edit your Housing Data:")
