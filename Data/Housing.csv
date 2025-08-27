@@ -1,3 +1,3 @@
 Name,Link,Adress,Rent,Distance,Rooms,Size,Kitchen,Furnished,Internet Speed,Viewing Appointment,Rental Period,Parking,Custom
-Sample Apartment,http://example.com,123 Main St,1200.0,5.6,3.5,85.0,True,False,100.0,28.08.2025 - 17:30,12 months,True, None
-Gemütliche 2-Zimmer Wohnung mit Balkon,https://tenant.immomio.com/de/expose/1811884256?origin=properties%2Fapplications,"Danziger Str. 1, 73730 Esslingen a.N., Deutschland",871.0,3.5,2.0,66.0,False,False,16.0,17.08.2025 - 14:20,Unlimited,True,
+example Appartment,https://tenant.immomio.com/de/expose/1811884256?origin=properties%2Fapplications,123 Main St,1200,5.6,3.5,85.0,True,False,100.0,28.08.2025 - 17:30,12 months,True,
+Gemütliche 2-Zimmer Wohnung mit Balkon,[Link](https://tenant.immomio.com/de/expose/1811884256?origin=properties%2Fapplications),"Danziger Str. 1, 73730 Esslingen a.N., Deutschland",871,3.5,2.0,66.0,False,False,16.0,17.08.2025 - 14:20,Unlimited,True,
