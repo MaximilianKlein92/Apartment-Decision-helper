@@ -173,6 +173,73 @@ def add_sidebar_block():
             st.sidebar.success("New housing option added!")
             st.rerun()
 
+def plotly_block():
+    df = load_housing()
+    if df.empty:
+        st.info("No data to plot. Please add housing options first.")
+        return
+
+    axis_options = ["Distance", "Rent", "Rooms", "Size"]
+    hue_options = ["Rooms", "Size", "Kitchen", "Furnished", "Parking"]
+    size_options = ["Size", "Rent", "Distance", "Rooms"]
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        x_axis = st.selectbox("X Axis", axis_options, index=0)
+    with col2:
+        y_axis = st.selectbox("Y Axis", axis_options, index=1)
+    with col3:
+        hue = st.selectbox("Hue (Color)", hue_options, index=0)
+    with col4:
+        bubble_size = st.selectbox("Bubble Size", size_options, index=3)
+
+    # Prepare hover text with all info for each point
+    hover_text = [
+        "<br>".join([
+            f"Name: {row['Name']}",
+            f"Adress: {row['Adress']}",
+            f"Rent: {row['Rent']}",
+            f"Distance: {row['Distance']}",
+            f"Rooms: {row['Rooms']}",
+            f"Size: {row['Size']}",
+            f"Kitchen: {row['Kitchen']}",
+            f"Furnished: {row['Furnished']}",
+            f"Rental Period: {row['Rental Period']}",
+            f"Parking: {row['Parking']}",
+            f"Custom: {row['Custom']}"
+        ])
+        for _, row in df.iterrows()
+    ]
+
+    # Handle boolean columns for color/hue
+    marker_color = df[hue]
+    if marker_color.dtype == bool:
+        marker_color = marker_color.astype(int)
+
+    marker_size = df[bubble_size]
+    # Normalize marker size for better visualization
+    marker_size = (marker_size - marker_size.min()) / (marker_size.max() - marker_size.min() + 1e-6) * 40 + 10
+
+    fig = go.Figure(data=go.Scatter(
+        x=df[x_axis],
+        y=df[y_axis],
+        mode="markers",
+        marker=dict(
+            size=marker_size,
+            color=marker_color,
+            showscale=True,
+            colorscale="Viridis"
+        ),
+        text=hover_text,
+        hovertemplate="%{text}<extra></extra>"
+    ))
+    fig.update_layout(
+        title=f"Housing Options: {y_axis} vs {x_axis} (Size: {bubble_size}, Color: {hue})",
+        xaxis_title=x_axis,
+        yaxis_title=y_axis
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
 # ------------------------ Page ------------------------
 
 def page_housing_body(app):
@@ -184,32 +251,9 @@ def page_housing_body(app):
     with col2:
         uploader_block()
 
-    def plotly_block():
-        df = load_housing()
-        if df.empty:
-            st.info("No data to plot. Please add housing options first.")
-            return
-        fig = go.Figure(data=go.Scatter(
-            x=df["Distance"],
-            y=df["Rent"],
-            mode="markers",
-            marker=dict(
-                size=df["Size"] / 2,
-                color=df["Rooms"],
-                showscale=True,
-                colorscale="Viridis"
-            ),
-            text=df[["Name", "Adress", "Link"]],
-            hoverinfo="text"
-        ))
-        fig.update_layout(
-            title="Housing Options: Rent vs Distance (Size as bubble size, Rooms as color)",
-            xaxis_title="Distance",
-            yaxis_title="Rent"
-        )
-        st.plotly_chart(fig, use_container_width=True)
 
     plotly_block()
+    st.info("Hover over a marker to see all details. Use the table below to open the link.")
 
     st.write("---")
     st.markdown("### View, Add and Edit your Housing Data:")
