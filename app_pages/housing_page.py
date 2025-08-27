@@ -1,11 +1,10 @@
 import streamlit as st
 import pandas as pd
 from urllib.parse import quote_plus
+import io
 
 def page_housing_body(app):
-    st.header("Housing Options")
-    st.write("Welcome to the Housing Comparison page")
-
+    
     df = pd.read_csv("Data/Housing.csv", dtype={
         "Name": str,
         "Link": str,
@@ -30,6 +29,50 @@ def page_housing_body(app):
             return ""
         return f"https://www.google.com/maps/place/{quote_plus(s)}"
 
+    st.write("---" )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.header("Housing Options")
+    with col2:
+        uploaded = st.file_uploader(
+            "Upload CSV", type=["csv"], key="housing_uploader",
+            help="Upload a CSV file to replace the current housing data."
+        )
+
+        if uploaded is not None:
+            try:
+                # Variante A: saubere Kopie -> immer frischer Stream
+                uploaded_bytes = uploaded.getvalue()
+                uploaded_df = pd.read_csv(io.BytesIO(uploaded_bytes))
+
+                # Alternativ (Variante B): Stream zurückspulen
+                # uploaded.seek(0)
+                # uploaded_df = pd.read_csv(uploaded)
+
+                expected_columns = [
+                    "Name", "Link", "Adress", "Rent", "Distance", "Rooms", "Size",
+                    "Kitchen", "Furnished", "Rental Period", "Parking", "Custom"
+                ]
+                if all(col in uploaded_df.columns for col in expected_columns):
+                    uploaded_df = uploaded_df[expected_columns]
+                    uploaded_df.to_csv("Data/Housing.csv", index=False)
+                    st.success("File uploaded and data replaced successfully!")
+
+                    # Wichtig: Uploader-State leeren, damit beim nächsten rerun
+                    # nicht erneut aus einem verbrauchten Stream gelesen wird.
+                    st.session_state.pop("housing_uploader", None)
+                    st.rerun()
+                else:
+                    st.error(
+                        "Uploaded CSV must contain the following columns: "
+                        + ", ".join(expected_columns)
+                    )
+            except Exception as e:
+                st.error(f"Error reading uploaded file: {e}")
+
+
+    st.write("---" )
     st.markdown("### View, Add and Edit your Housing Data:")
 
     # compute (or recompute) the clickable link column
@@ -59,7 +102,7 @@ def page_housing_body(app):
         st.success("Changes saved!")
         st.rerun()
 
-    # Add delete buttons next to the dataframe
+    # Add delete buttons below the dataframe
     st.markdown("#### Delete a Row")
     
     col1, col2 = st.columns(2)
