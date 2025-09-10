@@ -6,7 +6,7 @@ from app_pages.housing_page import page_housing_body
 from app_pages.hotels_page import page_hotels_body
 from app_pages.activities_page import page_activities_body
 
-app = Multipage("Option Clarifier")
+app = Multipage("Option Clarifieer")
 #app.add_page("Start", page_start_body)
 app.add_page("Housing", page_housing_body)
 #app.add_page("Hotels", page_hotels_body)
